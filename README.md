@@ -1,6 +1,6 @@
 # Bank Transaction Dashboard
 
-A Python-based financial dashboard for processing and visualizing bank transaction data. Built with Streamlit, Pandas, and Plotly as a learning project for data engineering and visualization fundamentals.
+A Python-based dashboard app for processing and visualizing bank transaction data. Built with Streamlit, Pandas, and Plotly as a learning project for data engineering and visualization fundamentals.
 
 ## Overview
 
