@@ -16,9 +16,8 @@ PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
 INPUT_FILE = RAW_DATA_DIR / "Umsatzliste_AT943200000014664403.csv"
 OUTPUT_FILE = PROCESSED_DATA_DIR / "Umsatzliste_processed.csv"
 
-# Configuration files
-CONFIG_DIR = PROJECT_ROOT / "config"
-MAPPING_FILE = CONFIG_DIR / "counterparty_mapping.json"
+# Mapping file
+MAPPING_FILE = PROJECT_ROOT / "config" / "counterparty_mapping.json"
 
 
 # ============================================================================
