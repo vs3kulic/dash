@@ -40,4 +40,7 @@ MANIFEST
 data/processed/
 data/raw/
 
+# Config files with sensitive mappings
+config/
+
 # Internal files
