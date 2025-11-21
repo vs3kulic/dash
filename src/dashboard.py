@@ -20,11 +20,6 @@ st.title("Banking Dashboard")
 # DATA TABLES
 # =========================================================
 
-# Raw data table
-st.header("Transaction Data (Raw)")
-st.dataframe(df.head(20))
-
-
 # Processed data table
 st.header("Transaction Data (Processed)")
 st.dataframe(df_processed.head(20))
