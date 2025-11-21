@@ -13,23 +13,41 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # Data files
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
-INPUT_FILE = RAW_DATA_DIR / "Umsatzliste_AT943200000014664403.csv"
+INPUT_FILE = RAW_DATA_DIR / "Umsatzliste_raw.csv"
 OUTPUT_FILE = PROCESSED_DATA_DIR / "Umsatzliste_processed.csv"
 
-# Mapping file
-MAPPING_FILE = PROJECT_ROOT / "config" / "counterparty_mapping.json"
+# Mapping files
+ALIAS_MAPPING = PROJECT_ROOT / "config" / "alias_mapping.json"
+CATEGORY_MAPPING = PROJECT_ROOT / "config" / "category_mapping.json"
 
 
 # ============================================================================
-# MAPPING LOADING
+# CATEGORY MAPPING
 # ============================================================================
 
-def load_mapping() -> dict:
-    """Loads the counterparty to category mapping from JSON config file."""
-    with open(MAPPING_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def load_category_mapping() -> dict:
+    """Loads the category mapping from JSON config file."""
+    # Open and read the JSON mapping file
+    with open(CATEGORY_MAPPING, 'r', encoding='utf-8') as f:
+        mapping = json.load(f)
 
-CP2CAT = load_mapping()
+    # Normalize all keys to uppercase
+    return {key.upper(): value for key, value in mapping.items()}
+
+
+def load_alias_mapping() -> dict:
+    """Loads the alias mapping from JSON config file."""
+    # Open and read the JSON mapping file
+    with open(ALIAS_MAPPING, 'r', encoding='utf-8') as f:
+        mapping = json.load(f)
+
+    # Normalize all keys to uppercase
+    return {key.upper(): value for key, value in mapping.items()}
+
+
+# Load mapping at module load time
+CP2CAT = load_category_mapping()
+ALIASES = load_alias_mapping()
 
 
 # ============================================================================
@@ -55,24 +73,37 @@ def load_data() -> pd.DataFrame:
 
 
 # ============================================================================
-# COUNTERPARTY AND CATEGORY EXTRACTION
+# COUNTERPARTY EXTRACTION AND CATEGORY ASSIGNMENT
 # ============================================================================
 
 def extract_counterparty(subject: str) -> str:
-    """Extract counterparty by checking against loaded mapping."""
-    for key in CP2CAT.keys():
-        if key.upper() in subject.upper():
-            return key
-    return "Uncategorized"
+    """Extract counterparty by checking against loaded mapping.
+    
+    :param subject: Transaction subject string
+    :return: Extracted counterparty name
+    """
+    subject_upper = subject.upper()
+    
+    # Check aliases first, longest first
+    for alias, canonical in sorted(ALIASES.items(), reverse=True):
+        if alias.upper() in subject_upper:
+            return canonical.upper()
+
+    # Check mapping keys, longest first
+    for counterparty in sorted(CP2CAT.keys(), key=len, reverse=True):
+        if counterparty in subject_upper:
+            return counterparty
+
+    return "UNCATEGORIZED"
 
 
 def assign_category(counterparty: str) -> str:
-    """Assigns category based on the counterparty.
+    """Assign category based on counterparty using the loaded mapping.
     
     :param counterparty: Extracted counterparty name
-    :return: Category name or "N/A" if not found
+    :return: Assigned category name
     """
-    return CP2CAT.get(counterparty, "Uncategorized")
+    return CP2CAT.get(counterparty, "uncategorized")
 
 
 # ============================================================================
@@ -86,13 +117,11 @@ def transform_file() -> pd.DataFrame:
 
     # Select needed columns and add new columns to the DataFrame
     df_processed = df[["booking_date", "subject", "amount"]].copy()
-
-    # Extract counterparty and assign category
-    df_processed["counterparty"] = df_processed['subject'].apply(extract_counterparty)
+    df_processed["counterparty"] = df_processed["subject"].apply(extract_counterparty)
     df_processed["category"] = df_processed["counterparty"].apply(assign_category)
 
-    # Save the processed DataFrame to a new CSV file
-    df_processed.to_csv(OUTPUT_FILE, index=False, decimal=',', sep=';')
+    # Save processed data to CSV
+    df_processed.to_csv(OUTPUT_FILE, index=False, decimal=",", sep=";")
     return df_processed
 
 

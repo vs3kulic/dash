@@ -1,50 +1,86 @@
 # Bank Transaction Dashboard
 
-A Python-based dashboard app for processing and visualizing bank transaction data. Built with Streamlit, Pandas, and Plotly as a learning project for data engineering and visualization fundamentals.
+A Python-based dashboard for processing and visualizing bank transaction data. Built with Streamlit and Pandas.
 
-## Overview
+## Features
 
-This application ingests CSV exports from bank accounts, cleans and transforms the data, and provides an interactive web interface for analyzing transaction patterns.
-
-**Features:**
-- CSV data ingestion and parsing
-- Data cleaning (handles German date/number formats)
-- Processed data storage
-- Transaction categorization (in progress)
-- Time-series visualization
+- Automated data processing from CSV exports
+- Configurable mappings and aliases via JSON mappings
+- Interactive charts for income, expenses, and category breakdowns
+- European format support (DD.MM.YYYY, comma decimal)
 
 ## Technology Stack
 
-- **Streamlit** - Web application framework
-- **Pandas** - Data manipulation and analysis
-- **NumPy** - Numerical computing
-- **Plotly** - Interactive visualization
+- Streamlit (dashboard UI)
+- Pandas (data processing)
+
+## Project Structure
+
+```
+Dashboard/
+├── src/
+│   ├── data_processing.py    # ETL pipeline
+│   └── dashboard.py         # Streamlit UI
+├── config/
+│   ├── category_mapping.json # Transaction categories
+│   └── alias_mapping.json    # Counterparty aliases
+├── data/
+│   ├── raw/                 # Input CSVs
+│   └── processed/           # Output data
+├── docs/
+│   └── notes.md             # Dev notes
+├── pyproject.toml           # Project config
+└── requirements.txt         # Dependencies
+```
 
 ## Setup
 
-**Prerequisites:** Python 3.8+
+### Conda (Recommended)
 
-1. Create virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+```bash
+conda create -n dashboard python=3.11
+conda activate dashboard
+conda install pip
+pip install -r requirements.txt
+pip install -e .
+```
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Usage
 
-3. Run application:
-   ```bash
-   streamlit run src/dashboard.py
-   ```
+Process transaction data:
 
-4. Access dashboard at `http://localhost:8501`
+```bash
+python src/data_processing.py
+```
 
-## Implementation Notes
+Launch dashboard:
 
-- Uses `pathlib` for cross-platform file path handling
-- Implements data cleaning pipeline separate from visualization layer
-- Handles European numeric formats (comma decimal separator, period thousands separator)
-- Date parsing configured for DD.MM.YYYY format
+```bash
+streamlit run src/dashboard.py
+```
+
+## Data Processing Pipeline
+
+1. Load: Read CSV with European formats
+2. Extract: Identify counterparties using pattern matching
+3. Normalize: Apply aliases (e.g., "AMZN" → "AMAZON")
+4. Categorize: Map transactions to categories
+5. Transform: Structure data for analysis
+6. Export: Save processed data
+
+
+## Configuration
+
+Transaction categories and aliases are configured via JSON files in `config/`. 
+
+## Dependencies
+
+See [`requirements.txt`](requirements.txt) for details.
+
+## Notes
+
+This project is for learning and experimentation. For setup and troubleshooting, see [`docs/notes.md`](docs/notes.md).
+
+---
+
+Happy coding!

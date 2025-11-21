@@ -39,6 +39,7 @@ MANIFEST
 # Document folders
 data/processed/
 data/raw/
+archive/
 
 # Config files with sensitive mappings
 config/

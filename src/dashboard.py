@@ -1,16 +1,38 @@
 import streamlit as st
 from data_processing import load_data, transform_file
 
+# =========================================================
+# DATA LOADING
+# =========================================================
+
 # Load data using the function from data_processing module
 df = load_data()
 df_processed = transform_file()
 
+# =========================================================
+# DASHBOARD
+# =========================================================
+
 # App title
 st.title("Banking Dashboard")
 
-# Display raw data table
+# =========================================================
+# DATA TABLES
+# =========================================================
+
+# Raw data table
 st.header("Transaction Data (Raw)")
 st.dataframe(df.head(20))
+
+
+# Processed data table
+st.header("Transaction Data (Processed)")
+st.dataframe(df_processed.head(20))
+
+
+# =========================================================
+# CHARTS
+# =========================================================
 
 # Placeholder for a simple chart (e.g., amount over time)
 st.header("Net Income/Expense Over Time (CF)")
@@ -22,18 +44,11 @@ if not df.empty:
 else:
     st.write("No data to display.")
 
-# Placeholder for a more complex chart (e.g., amount over time)
-st.header("Expense per Category")
+
+# Placeholder for processed data table
+st.header("Sum per Category (Total)")
 if not df_processed.empty:
-    # Exclude internal_transfer category
-    df_temp = df_processed[df_processed['category'] != 'internal_transfer'].copy()
-    # Exclude positive amounts (income)
-    df_temp = df_temp[df_temp['amount'] < 0]
-    # Group by month and category
-    df_temp['month'] = df_temp['booking_date'].dt.to_period('M')
-    chart_data_cat = df_temp.groupby(['month', 'category'])['amount'].sum().reset_index()
-    chart_data_cat['month'] = chart_data_cat['month'].dt.to_timestamp()
-    chart_data_cat = chart_data_cat.pivot(index='month', columns='category', values='amount').fillna(0)
-    st.bar_chart(chart_data_cat)
+    category_sum = df_processed.groupby('category')['amount'].sum().reset_index()
+    st.bar_chart(category_sum.set_index('category'), horizontal=True)
 else:
-    st.write("No data to display.")
+    st.write("No processed data to display.")
