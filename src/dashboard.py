@@ -1,5 +1,5 @@
 import streamlit as st
-from data_processing import load_data, transform_file
+from data_processing import load_data, transform_file, category_totals, period_totals
 
 # =========================================================
 # DATA LOADING
@@ -30,7 +30,7 @@ st.dataframe(df_processed.head(20))
 # =========================================================
 
 # Placeholder for a simple chart (e.g., amount over time)
-st.header("Net Income/Expense Over Time (CF)")
+st.header("Net Income/Expense per Month (CF)")
 if not df.empty:
     # Group by month and sum amounts
     chart_data = df.groupby(df['booking_date'].dt.to_period('M'))['amount'].sum().reset_index()
@@ -43,7 +43,17 @@ else:
 # Placeholder for processed data table
 st.header("Sum per Category (Total)")
 if not df_processed.empty:
-    category_sum = df_processed.groupby('category')['amount'].sum().reset_index()
-    st.bar_chart(category_sum.set_index('category'), horizontal=True)
+    category_sum = category_totals(df_processed)
+    st.dataframe(category_sum)
 else:
     st.write("No processed data to display.")
+
+
+# Placeholder for period totals
+st.header("Sum per Category (Monthly)")
+if not df_processed.empty:
+    period_sum = period_totals(df_processed, "M")
+    st.dataframe(period_sum)
+else:
+    st.write("No processed data to display.")
+

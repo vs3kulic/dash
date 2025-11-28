@@ -68,9 +68,9 @@ def extract_counterparty(subject: str) -> str:
     subject_upper = subject.upper()
 
     # Check aliases first, longest first (sorted by key length)
-    for alias, canonical in sorted(ALIASES.keys(), key=len, reverse=True):
+    for alias in sorted(ALIASES.keys(), key=len, reverse=True):
         if alias in subject_upper:
-            return canonical.upper()  # Return the canonical name in uppercase
+            return ALIASES[alias]   # Return mapped counterparty name
 
     # Check mapping keys, longest first
     for counterparty in sorted(CP2CAT.keys(), key=len, reverse=True):
@@ -105,6 +105,33 @@ def extract_purpose(subject: str) -> str:
 
 
 # ============================================================================
+# PERFORM CALCULATIONS
+# ============================================================================
+
+def category_totals(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculates sum of amounts per category in total.
+    
+    :param df: DataFrame with processed transaction data
+    :return: DataFrame with sum of amounts per category
+    """
+    # Load data if not provided
+    category_sum = df.groupby("category")["amount"].sum().reset_index()
+    return category_sum
+
+
+def period_totals(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Calculates sum of amounts per category for a given period (e.g., monthly).
+    
+    :param df: DataFrame with processed transaction data
+    :param period: Period string for grouping (e.g., 'M' for month)
+    :return: DataFrame with sum of amounts per category per period
+    """
+    df['period'] = df["booking_date"].dt.to_period(period)
+    period_sum = df.groupby(["period", "category"])["amount"].sum().reset_index()
+    return period_sum
+
+
+# ============================================================================
 # DATA TRANSFORMATION PIPELINE
 # ============================================================================
 
@@ -132,6 +159,14 @@ def main():
     """Main function for demonstrating the data loading."""
     df_transformed = transform_file()
     print(df_transformed.head(50))
+    print("\nCategory Totals:")
+    print("===================================")
+    category = category_totals(df_transformed)
+    print(category)
+    print("\nCategory Totals (Monthly):")
+    print("===================================")
+    monthly = period_totals(df_transformed, 'M')
+    print(monthly)
 
 if __name__ == "__main__":
     main()
