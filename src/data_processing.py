@@ -11,7 +11,7 @@ import config.config as config
 def load_category_mapping() -> dict:
     """Loads the category mapping from JSON config file."""
     # Open and read the JSON mapping file
-    with open(config.CATEGORY_MAPPING, 'r', encoding='utf-8') as f:
+    with open(config.CATEGORY_MAPPING, "r", encoding="utf-8") as f:
         mapping = json.load(f)
 
     # Normalize all keys to uppercase
@@ -21,7 +21,7 @@ def load_category_mapping() -> dict:
 def load_alias_mapping() -> dict:
     """Loads the alias mapping from JSON config file."""
     # Open and read the JSON mapping file
-    with open(config.ALIAS_MAPPING, 'r', encoding='utf-8') as f:
+    with open(config.ALIAS_MAPPING, "r", encoding="utf-8") as f:
         mapping = json.load(f)
 
     # Normalize all keys to uppercase
@@ -56,7 +56,7 @@ def load_data() -> pd.DataFrame:
 
 
 # ============================================================================
-# COUNTERPARTY EXTRACTION AND CATEGORY ASSIGNMENT
+# DATA EXTRACTION AND CATEGORY ASSIGNMENT
 # ============================================================================
 
 def extract_counterparty(subject: str) -> str:
@@ -67,8 +67,8 @@ def extract_counterparty(subject: str) -> str:
     """
     subject_upper = subject.upper()
 
-    # Check aliases first, longest first
-    for alias, canonical in sorted(ALIASES.items(), key=len, reverse=True):
+    # Check aliases first, longest first (sorted by key length)
+    for alias, canonical in sorted(ALIASES.keys(), key=len, reverse=True):
         if alias in subject_upper:
             return canonical.upper()  # Return the canonical name in uppercase
 
