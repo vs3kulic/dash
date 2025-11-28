@@ -108,14 +108,32 @@ def extract_purpose(subject: str) -> str:
 # PERFORM CALCULATIONS
 # ============================================================================
 
+def cash_flow(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Calculates monthly cash flow (net income/expense).
+    
+    :param df: DataFrame with transaction data
+    :return: DataFrame with monthly cash flow
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    tmp = df.copy()
+
+    # Create new column for month
+    tmp["month"] = tmp["booking_date"].dt.to_period(period)  # Convert Timestamp -> Period
+
+    # Group by month and sum amounts
+    monthly_cf = tmp.groupby("month")["amount"].sum().reset_index()  # Reset index, else month becomes index
+    monthly_cf["month"] = monthly_cf["month"].dt.to_timestamp()   # Convert Period -> Timestamp, for plotting
+    return monthly_cf
+
+
 def category_totals(df: pd.DataFrame) -> pd.DataFrame:
     """Calculates sum of amounts per category in total.
     
     :param df: DataFrame with processed transaction data
     :return: DataFrame with sum of amounts per category
     """
-    # Load data if not provided
-    category_sum = df.groupby("category")["amount"].sum().reset_index()
+    tmp = df.copy()
+    category_sum = tmp.groupby("category")["amount"].sum().reset_index()
     return category_sum
 
 
@@ -126,8 +144,9 @@ def period_totals(df: pd.DataFrame, period: str) -> pd.DataFrame:
     :param period: Period string for grouping (e.g., 'M' for month)
     :return: DataFrame with sum of amounts per category per period
     """
-    df['period'] = df["booking_date"].dt.to_period(period)
-    period_sum = df.groupby(["period", "category"])["amount"].sum().reset_index()
+    tmp = df.copy()
+    tmp["period"] = tmp["booking_date"].dt.to_period(period)  # Convert Timestamp -> Period
+    period_sum = tmp.groupby(["period", "category"])["amount"].sum().reset_index()
     return period_sum
 
 
@@ -151,18 +170,32 @@ def transform_file() -> pd.DataFrame:
     return df_processed
 
 
+# TODO: Review report generation functions
+# TODO: Set up export path in config
+def period_totals_report(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Generates a csv report of period totals."""
+    period_sums = period_totals(df, period)
+    period_sums.to_csv(config.REPORTS_DIR, index=False, decimal=",", sep=";")
+    return period_sums
+
+
 # ============================================================================
 # MAIN EXECUTION
 # ============================================================================
 
 def main():
     """Main function for demonstrating the data loading."""
+    # Load and transform data
     df_transformed = transform_file()
     print(df_transformed.head(50))
+
+    # Demonstrate category totals
     print("\nCategory Totals:")
     print("===================================")
     category = category_totals(df_transformed)
     print(category)
+
+    # Demonstrate period totals (monthly)
     print("\nCategory Totals (Monthly):")
     print("===================================")
     monthly = period_totals(df_transformed, 'M')

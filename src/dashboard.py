@@ -1,5 +1,5 @@
 import streamlit as st
-from data_processing import load_data, transform_file, category_totals, period_totals
+from data_processing import load_data, transform_file, category_totals, period_totals, cash_flow
 
 # =========================================================
 # DATA LOADING
@@ -29,18 +29,16 @@ st.dataframe(df_processed.head(20))
 # CHARTS
 # =========================================================
 
-# Placeholder for a simple chart (e.g., amount over time)
+# Placeholder for Cash Flow chart
 st.header("Net Income/Expense per Month (CF)")
 if not df.empty:
-    # Group by month and sum amounts
-    chart_data = df.groupby(df['booking_date'].dt.to_period('M'))['amount'].sum().reset_index()
-    chart_data['booking_date'] = chart_data['booking_date'].dt.to_timestamp()
-    st.line_chart(chart_data.set_index('booking_date'))
+    monthly_cf = cash_flow(df_processed, period="M")
+    st.line_chart(monthly_cf.set_index("month"))
 else:
     st.write("No data to display.")
 
 
-# Placeholder for processed data table
+# Placeholder for Category totals
 st.header("Sum per Category (Total)")
 if not df_processed.empty:
     category_sum = category_totals(df_processed)
@@ -49,11 +47,10 @@ else:
     st.write("No processed data to display.")
 
 
-# Placeholder for period totals
+# Placeholder for Period totals
 st.header("Sum per Category (Monthly)")
 if not df_processed.empty:
-    period_sum = period_totals(df_processed, "M")
+    period_sum = period_totals(df_processed, period="M")
     st.dataframe(period_sum)
 else:
     st.write("No processed data to display.")
-
