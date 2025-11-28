@@ -114,13 +114,8 @@ def cash_flow(df: pd.DataFrame, period: str) -> pd.DataFrame:
     :param df: DataFrame with transaction data
     :return: DataFrame with monthly cash flow
     """
-    # Create a copy to avoid modifying the original DataFrame
     tmp = df.copy()
-
-    # Create new column for month
     tmp["month"] = tmp["booking_date"].dt.to_period(period)  # Convert Timestamp -> Period
-
-    # Group by month and sum amounts
     monthly_cf = tmp.groupby("month")["amount"].sum().reset_index()  # Reset index, else month becomes index
     monthly_cf["month"] = monthly_cf["month"].dt.to_timestamp()   # Convert Period -> Timestamp, for plotting
     return monthly_cf
@@ -198,7 +193,7 @@ def main():
     # Demonstrate period totals (monthly)
     print("\nCategory Totals (Monthly):")
     print("===================================")
-    monthly = period_totals(df_transformed, 'M')
+    monthly = period_totals(df_transformed, "M")
     print(monthly)
 
 if __name__ == "__main__":
