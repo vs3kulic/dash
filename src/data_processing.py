@@ -167,7 +167,10 @@ def transform_file() -> pd.DataFrame:
     return df_processed
 
 
-# TODO: Set up export path in config
+# ============================================================================
+# REPORT GENERATION
+# ============================================================================
+
 def period_totals_report(df: pd.DataFrame, period: str) -> pd.DataFrame:
     """Generates a csv report of period totals."""
     period_sums = period_totals(df, period)
