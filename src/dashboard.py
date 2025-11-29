@@ -17,7 +17,7 @@ df_processed = transform_file()
 st.title("Banking Dashboard")
 
 # =========================================================
-# DATA TABLES
+# RAW DATA TABLE
 # =========================================================
 
 # Processed data table
@@ -37,6 +37,10 @@ if not df.empty:
 else:
     st.write("No data to display.")
 
+
+# =========================================================
+# TABLES
+# =========================================================
 
 # Placeholder for Category totals
 st.header("Sum per Category (Total)")
