@@ -173,7 +173,8 @@ def transform_file() -> pd.DataFrame:
 
 def period_totals_report(df: pd.DataFrame, period: str) -> pd.DataFrame:
     """Generates a csv report of period totals."""
-    period_sums = period_totals(df, period)
+    tmp = df[["booking_date", "category", "amount"]].copy()
+    period_sums = period_totals(tmp, period)
     period_sums.to_csv(config.REPORTS_DIR, index=False, decimal=",", sep=";")
     return period_sums
 
@@ -183,26 +184,23 @@ def period_totals_report(df: pd.DataFrame, period: str) -> pd.DataFrame:
 # ============================================================================
 
 def main():
-    """Main function for demonstrating the data loading."""
-    # Load and transform data
+    """Main function for demonstrating the data processing pipeline."""
     df_transformed = transform_file()
-    print(df_transformed.head(50))
+    print("\nSample of transformed data:")
 
-    # Demonstrate category totals
-    print("\nCategory Totals:")
-    print("===================================")
+    print("\nTotal Amounts per Category")
+    print("================================")
     category = category_totals(df_transformed)
     print(category)
 
-    # Demonstrate period totals (monthly)
-    print("\nCategory Totals (Monthly):")
-    print("===================================")
+    print("\nMonthly Amounts per Category")
+    print("========================================")
     monthly = period_totals(df_transformed, "M")
     print(monthly)
 
     # Generate period totals report
     report = period_totals_report(df_transformed, "M")
-    print(report)
+    print(f"Report saved to: {config.REPORTS_DIR}")
 
 if __name__ == "__main__":
     main()
