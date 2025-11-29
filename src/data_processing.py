@@ -87,7 +87,9 @@ def assign_category(counterparty: str) -> str:
     :param counterparty: Extracted counterparty name
     :return: Assigned category name
     """
-    return CP2CAT.get(counterparty, "uncategorized")
+    if counterparty not in CP2CAT:
+        return "uncategorized"
+    return CP2CAT[counterparty]
 
 
 def extract_purpose(subject: str) -> str:
@@ -115,9 +117,9 @@ def cash_flow(df: pd.DataFrame, period: str) -> pd.DataFrame:
     :return: DataFrame with monthly cash flow
     """
     tmp = df.copy()
-    tmp["month"] = tmp["booking_date"].dt.to_period(period)  # Convert Timestamp -> Period
+    tmp["month"] = tmp["booking_date"].dt.to_period(period)
     monthly_cf = tmp.groupby("month")["amount"].sum().reset_index()  # Reset index, else month becomes index
-    monthly_cf["month"] = monthly_cf["month"].dt.to_timestamp()   # Convert Period -> Timestamp, for plotting
+    monthly_cf["month"] = monthly_cf["month"].dt.to_timestamp()  # recast Period to Timestamp for plotting
     return monthly_cf
 
 
@@ -140,7 +142,7 @@ def period_totals(df: pd.DataFrame, period: str) -> pd.DataFrame:
     :return: DataFrame with sum of amounts per category per period
     """
     tmp = df.copy()
-    tmp["period"] = tmp["booking_date"].dt.to_period(period)  # Convert Timestamp -> Period
+    tmp["period"] = tmp["booking_date"].dt.to_period(period)
     period_sum = tmp.groupby(["period", "category"])["amount"].sum().reset_index()
     return period_sum
 
@@ -151,11 +153,11 @@ def period_totals(df: pd.DataFrame, period: str) -> pd.DataFrame:
 
 def transform_file() -> pd.DataFrame:
     """Transforms the input CSV file and saves the processed data."""
-    # Load mapping and data
-    df = load_data()
+    # Load source data, select relevant columns and create a copy
+    src = load_data()
+    df_processed = src[["booking_date", "subject", "amount"]].copy()
 
-    # Select needed columns and add new columns to the DataFrame
-    df_processed = df[["booking_date", "subject", "amount"]].copy()
+    # Extract counterparty, category, and purpose
     df_processed["counterparty"] = df_processed["subject"].apply(extract_counterparty)
     df_processed["category"] = df_processed["counterparty"].apply(assign_category)
     df_processed["purpose"] = df_processed["subject"].apply(extract_purpose)
@@ -165,7 +167,6 @@ def transform_file() -> pd.DataFrame:
     return df_processed
 
 
-# TODO: Review report generation functions
 # TODO: Set up export path in config
 def period_totals_report(df: pd.DataFrame, period: str) -> pd.DataFrame:
     """Generates a csv report of period totals."""
@@ -195,6 +196,10 @@ def main():
     print("===================================")
     monthly = period_totals(df_transformed, "M")
     print(monthly)
+
+    # Generate period totals report
+    report = period_totals_report(df_transformed, "M")
+    print(report)
 
 if __name__ == "__main__":
     main()
