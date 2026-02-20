@@ -88,7 +88,7 @@ See [`requirements.txt`](requirements.txt) for details.
 
 ## Notes
 
-This project is for learning and experimentation. For setup and troubleshooting, see [`docs/notes.md`](docs/notes.md).
+This project is for learning and experimentation.
 
 ---
 
