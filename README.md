@@ -7,7 +7,6 @@ This project incorporates supervised machine learning for transaction categoriza
 - Automated data processing from CSV exports
 - Configurable mappings and aliases via JSON mappings
 - Supervised machine learning for transaction categorization
-- Detailed analysis of income, expenses, and category breakdowns
 - European format support (DD.MM.YYYY, comma decimal)
 
 ## Technology Stack
