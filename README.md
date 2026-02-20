@@ -40,8 +40,8 @@ Dashboard/
 ### Conda (Recommended)
 
 ```bash
-conda create -n dashboard python=3.11
-conda activate dashboard
+conda create -n dash python=3.13
+conda activate dash
 conda install pip
 pip install -r requirements.txt
 pip install -e .
