@@ -1,5 +1,5 @@
 pandas
 numpy
-plotly
-streamlit
-watchdog  # For monitoring file changes
+watchdog        # For monitoring file changes
+scikit-learn    # For data preprocessing and modeling
+matplotlib      # For data visualization

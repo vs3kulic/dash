@@ -27,40 +27,6 @@ Path(__file__).parent / "data" / "file.csv"
 
 **Why it works:** `__file__` is the absolute path to the current Python file, so you always know where you are. No guessing about "current directory".
 
-## Useful Path Tricks
-
-```python
-from pathlib import Path
-
-# Example: working with input file
-PROJECT_ROOT = Path(__file__).parent.parent
-RAW_DATA = PROJECT_ROOT/"data"/"raw"/
-input_file = RAW_DATA/"Umsatzliste_AT943200000014664403.csv"
-
-# Check if file exists
-if input_file.exists():
-    print("File found!")
-
-# Get filename without extension
-input_file.stem  # "Umsatzliste_AT943200000014664403"
-
-# Get just the filename
-input_file.name  # "Umsatzliste_AT943200000014664403.csv"
-
-# Get file extension
-input_file.suffix  # ".csv"
-
-# Create directories if they don't exist
-output_dir = Path(__file__).parent.parent / "data" / "processed"
-output_dir.mkdir(parents=True, exist_ok=True)
-
-# Read file content directly
-text_content = input_file.read_text()
-
-# Write to file
-output_file = output_dir / "cleaned_data.csv"
-output_file.write_text("data here")
-```
 
 ## Common Pattern for Data Projects
 
