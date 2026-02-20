@@ -1,6 +1,6 @@
 # Bank Transaction Analysis
 
-A Python-based tool for processing and analyzing bank transaction data. This project incorporates supervised machine learning for transaction categorization.
+This project incorporates supervised machine learning for transaction categorization.
 
 ## Features
 
