@@ -1,96 +1,47 @@
-# Bank Transaction Analysis
+# Bank Transaction Categorization
 
-A Python-based tool for processing and analyzing bank transaction data. This project incorporates supervised machine learning for transaction categorization.
+A Python project for processing, analyzing, and automatically categorizing bank transactions using supervised machine learning.
 
-## Features
+## Goal
 
-- Automated data processing from CSV exports
-- Configurable mappings and aliases via JSON mappings
-- Supervised machine learning for transaction categorization
-- Detailed analysis of income, expenses, and category breakdowns
-- European format support (DD.MM.YYYY, comma decimal)
-
-## Technology Stack
-
-- Pandas (data processing)
-- Scikit-learn (supervised ML)
+This project explores if we can automatically categorize transactions based on subject text and amount, using ~250 labeled transactions across 13 categories.
 
 ## Project Structure
 
 ```
-Dashboard/
+Dash/
 ├── src/
-│   ├── processing.py            # ETL pipeline
-│   ├── class_distribution.py    # Distribution of categories
-│   ├── location_measures.py     # Statistics for dataset
-│   ├── text_analysis.py         # Subject text analysis 
-│   ├── categorization.py        # ML model training and prediction
+│   ├── processing.py            # ETL pipeline: load, clean, extract, categorize
+│   ├── class_distribution.py    # Class imbalance analysis
+│   ├── location_measures.py     # Descriptive statistics (mean, median, outliers)
+│   ├── text_analysis.py         # Keyword and pattern analysis per category
+│   └── correlation_analysis.py  # Correlation between amount and categories
 ├── config/
-│   ├── category_mapping.json    # Transaction categories
-│   └── alias_mapping.json       # Counterparty aliases
+│   ├── config.py                # Paths and project-wide settings
+│   ├── category_mapping.json    # Counterparty → category mappings
+│   └── alias_mapping.json       # Counterparty alias normalization
 ├── data/
-│   ├── raw/                     # Input CSVs
-│   └── processed/               # Output data
+│   ├── raw/                     # Raw CSV exports (European format)
+│   └── processed/               # Cleaned and labeled output
 ├── docs/
-│   └── notes.md                 # Dev notes
-└── requirements.txt             # Dependencies
+│   └── todo.md                  # Workflow tracker
+└── requirements.txt
 ```
 
 ## Setup
 
-### Conda (Recommended)
-
 ```bash
-conda create -n dashboard python=3.11
-conda activate dashboard
-conda install pip
+conda create -n <env> python=3.11
+conda activate <env>
 pip install -r requirements.txt
 pip install -e .
 ```
 
-## Usage
+## License
 
-Process transaction data:
-
-```bash
-python src/data_processing.py
-```
-
-Train categorization model:
-
-```bash
-python src/categorization.py --train
-```
-
-Predict categories:
-
-```bash
-python src/categorization.py --predict
-```
-
-## Data Processing Pipeline
-
-1. Load: Read CSV with European formats
-2. Extract: Identify counterparties using pattern matching
-3. Normalize: Apply aliases (e.g., "AMZN" → "AMAZON")
-4. Categorize: Map transactions to categories using supervised ML
-5. Transform: Structure data for analysis
-6. Export: Save processed data
-
-## Configuration
-
-- Transaction categories and aliases are configured via JSON files in `config/`
-- Paths to I/O files and mappings are configured via `config.py` in `config/`
-- ML model parameters and training data paths are configured in `categorization.py`
-
-## Dependencies
-
-See [`requirements.txt`](requirements.txt) for details.
-
-## Notes
-
-This project is for learning and experimentation. For setup and troubleshooting, see [`docs/notes.md`](docs/notes.md).
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-Happy coding!
+*Built transaction by transaction. One day the model will know where the money went before we do.*
+
