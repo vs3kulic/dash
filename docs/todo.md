@@ -33,7 +33,8 @@ Following the **Basic Data Analysis Workflow**
   - [x] Class distribution analysis → Severe imbalance found
   - [x] Location measures computed (mean, median, outliers)
   - [x] Text pattern analysis incl. common keywords per category
-  - [ ] Correlation Analysis
+  - [x] Correlation Analysis
+  - [ ] Summarize findings from EDA (Location Measures, Class Distribution, Text and Correlation Analysis)
 
 - [ ] **Feature Engineering**
   - [ ] Text vectorization (TF-IDF)
@@ -58,11 +59,13 @@ Following the **Basic Data Analysis Workflow**
   - Reasons: Good for multiclass text classification, interpretable, handles high-dimensional sparse features (TF-IDF)
   - Plan: Use `class_weight='balanced'` for imbalance
 
-- [ ] **Alternative Models to Compare**
-  - [ ] Naive Bayes (good baseline for text)
-  - [ ] Random Forest (handles imbalance well)
-  - [ ] Linear SVM (alternative to LogReg)
-  - [ ] XGBoost (if tree-based works better)
+- [ ] **Alternative Model: Random Forest**
+  - Reasons: Handles imbalance well, robust on small datasets
+  - Plan: Compare against Logistic Regression
+
+- [ ] **Class Imbalance: SMOTE**
+  - Explore SMOTE as an alternative to `class_weight='balanced'`
+  - Integrate into preprocessing pipeline if needed
 
 ---
 

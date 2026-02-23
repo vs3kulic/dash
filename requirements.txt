@@ -1,5 +1,6 @@
-pandas
-numpy
-watchdog        # For monitoring file changes
-scikit-learn    # For data preprocessing and modeling
-matplotlib      # For data visualization
+pandas           # For data manipulation and analysis
+numpy            # For numerical computing
+watchdog         # For monitoring file changes
+scikit-learn     # For data preprocessing and modeling
+matplotlib       # For data visualization
+seaborn          # For statistical data visualization

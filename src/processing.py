@@ -9,6 +9,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 import json
 import pandas as pd
 import config.config as config
+import seaborn as sns
+import matplotlib.pyplot as plt
+from src.correlation_analysis import compute_correlations
 
 
 # ============================================================================
@@ -176,6 +179,12 @@ def main():
     category_totals = df_train.groupby("category")["amount"].sum().sort_values()
     print(category_totals)
 
+    # Compute correlations for training data
+    print("\n" + "="*30)
+    print("CORRELATION ANALYSIS")
+    print("="*30)
+    correlation_matrix = compute_correlations(df_train)
+    print("Correlation matrix computed and visualized.")
 
 if __name__ == "__main__":
     main()
