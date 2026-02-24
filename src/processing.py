@@ -9,9 +9,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 import json
 import pandas as pd
 import config.config as config
-import seaborn as sns
-import matplotlib.pyplot as plt
-from src.correlation_analysis import compute_correlations
 
 
 # ============================================================================
@@ -68,6 +65,9 @@ def load_data(input_file: Path = None) -> pd.DataFrame:
     # Convert dates from German format (DD.MM.YYYY or DD.MM.YY)
     df["booking_date"] = pd.to_datetime(df["booking_date"], format='mixed', dayfirst=True)
     df["execution_date"] = pd.to_datetime(df["execution_date"], format='mixed', dayfirst=True)
+
+    # Clean subject by stripping whitespace and converting to lowercase
+    df["subject"] = df["subject"].str.strip()
 
     return df
 
@@ -156,35 +156,11 @@ def main():
     # Process validation data
     print("\n" + "="*60)
     print("PROCESSING VALIDATION DATA")
-    print("="*30)
+    print("="*60)
     df_val = transform_file(config.VAL_INPUT_FILE, config.VAL_OUTPUT_FILE)
     print(f"Validation data processed: {config.VAL_INPUT_FILE}")
     print(f"Saved to: {config.VAL_OUTPUT_FILE}")
     print(f"Validation samples: {len(df_val)}")
-
-    # Display statistics from training data
-    print("\n" + "="*30)
-    print("TRAINING DATA STATISTICS")
-    print("="*30)
-
-    print(f"Total Transactions: {len(df_train)}")
-    print(f"Unique Categories: {df_train['category'].nunique()}")
-
-    print("\nCategory Distribution:")
-    print("--" * 15)
-    print(df_train["category"].value_counts().sort_index())
-
-    print("\nTotal Amount by Category:")
-    print("--" * 15)
-    category_totals = df_train.groupby("category")["amount"].sum().sort_values()
-    print(category_totals)
-
-    # Compute correlations for training data
-    print("\n" + "="*30)
-    print("CORRELATION ANALYSIS")
-    print("="*30)
-    correlation_matrix = compute_correlations(df_train)
-    print("Correlation matrix computed and visualized.")
 
 if __name__ == "__main__":
     main()
