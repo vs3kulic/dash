@@ -12,19 +12,8 @@ This project explores if we can automatically categorize transactions based on s
 Dash/
 ├── src/
 │   ├── processing.py            # ETL pipeline: load, clean, extract, categorize
-│   ├── class_distribution.py    # Class imbalance analysis
-│   ├── location_measures.py     # Descriptive statistics (mean, median, outliers)
-│   ├── text_analysis.py         # Keyword and pattern analysis per category
-│   └── correlation_analysis.py  # Correlation between amount and categories
-├── config/
-│   ├── config.py                # Paths and project-wide settings
-│   ├── category_mapping.json    # Counterparty → category mappings
-│   └── alias_mapping.json       # Counterparty alias normalization
-├── data/
-│   ├── raw/                     # Raw CSV exports (European format)
-│   └── processed/               # Cleaned and labeled output
-├── docs/
-│   └── todo.md                  # Workflow tracker
+│   └── analysis.py              # EDA: location measures, class distribution, correlation, text patterns
+├── README.md
 └── requirements.txt
 ```
 
