@@ -11,7 +11,7 @@ Sections
 """
 
 import sys
-import joblib
+import pickle
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -33,7 +33,7 @@ from src.feature_engineering import build_feature_matrix, transform_features
 # Paths
 # ---------------------------------------------------------------------------
 MODELS_DIR = PROJECT_ROOT / "models"
-MODEL_PATH = MODELS_DIR / "logistic_regression.joblib"
+MODEL_PATH = MODELS_DIR / "logistic_regression.pkl"
 
 
 # ===========================================================================
@@ -154,7 +154,8 @@ def main() -> None:
 
     # ── Save ─────────────────────────────────────────────────────────────────
     MODELS_DIR.mkdir(exist_ok=True)
-    joblib.dump({"model": model, "vectorizer": vectorizer, "scaler": scaler}, MODEL_PATH)
+    with open(MODEL_PATH, "wb") as f:
+        pickle.dump({"model": model, "vectorizer": vectorizer, "scaler": scaler}, f)
     print(f"\nModel saved to {MODEL_PATH}")
 
 
