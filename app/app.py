@@ -84,7 +84,53 @@ app_ui = ui.page_navbar(
         ui.output_text_verbatim("model_summary"),
     ),
 
-    # ── Panel 3: Prediction Tool ─────────────────────────────────────────────
+    # ── Panel 3: Hyperparameter Tuning ────────────────────────────────────────
+    ui.nav_panel(
+        "Hyperparameter Tuning",
+        ui.h3("Hyperparameter Tuning"),
+        ui.p(
+            "Retrain the model with different settings and see the effect on macro-F1 immediately. "
+            "Compare against the baseline (C=1.0, max_features=500, ngrams 1–2)."
+        ),
+        ui.layout_sidebar(
+            ui.sidebar(
+                ui.h5("Logistic Regression"),
+                ui.input_numeric(
+                    "tune_C", "C (regularization)",
+                    value=1.0, min=0.01, max=100.0, step=0.1,
+                ),
+                ui.p(
+                    ui.em("Smaller C = stronger regularization = simpler model. "
+                          "Try lowering it if the model overfits."),
+                    style="font-size:0.8rem; color:#666;",
+                ),
+                ui.hr(),
+                ui.h5("TF-IDF"),
+                ui.input_numeric(
+                    "tune_max_features", "max_features (vocabulary size)",
+                    value=500, min=50, max=5000, step=50,
+                ),
+                ui.input_numeric(
+                    "tune_ngram_min", "n-gram min",
+                    value=1, min=1, max=3, step=1,
+                ),
+                ui.input_numeric(
+                    "tune_ngram_max", "n-gram max",
+                    value=2, min=1, max=3, step=1,
+                ),
+                ui.p(
+                    ui.em("(1,1) = unigrams only. (1,2) adds bigrams. "
+                          "Bigrams capture phrases like 'google ads' as one token."),
+                    style="font-size:0.8rem; color:#666;",
+                ),
+                ui.hr(),
+                ui.input_action_button("tune_btn", "Retrain & Evaluate", class_="btn-primary w-100"),
+            ),
+            ui.output_text_verbatim("tune_result"),
+        ),
+    ),
+
+    # ── Panel 4: Prediction Tool ─────────────────────────────────────────────
     ui.nav_panel(
         "Prediction",
         ui.h3("Prediction Tool"),
@@ -138,7 +184,74 @@ def server(input, output, session):
             f"Validation macro-F1: {f1_val:.4f}\n"
         )
 
-    # ── Panel 3 ──────────────────────────────────────────────────────────────
+    # ── Panel 3: Hyperparameter Tuning ──────────────────────────────────────
+    @reactive.Calc
+    @reactive.event(input.tune_btn)
+    def _tune_result():
+        from sklearn.linear_model import LogisticRegression
+
+        C            = float(input.tune_C())
+        max_features = int(input.tune_max_features())
+        ngram_min    = int(input.tune_ngram_min())
+        ngram_max    = int(input.tune_ngram_max())
+
+        if ngram_min > ngram_max:
+            return "n-gram min must be ≤ n-gram max."
+
+        ngram_range = (ngram_min, ngram_max)
+
+        # Retrain from scratch with new hyperparameters
+        X_train, y_train, vectorizer, scaler = build_feature_matrix(
+            df_train, ngram_range=ngram_range, max_features=max_features
+        )
+        X_val = transform_features(df_val, vectorizer, scaler)
+        y_val = df_val["category"].values
+
+        model = LogisticRegression(
+            C=C, class_weight="balanced", solver="lbfgs",
+            max_iter=1000, random_state=42,
+        )
+        model.fit(X_train, y_train)
+
+        f1_train = f1_score(y_train, model.predict(X_train), average="macro", zero_division=0)
+        f1_val   = f1_score(y_val,   model.predict(X_val),   average="macro", zero_division=0)
+
+        # Baseline (model loaded at startup)
+        f1_base_train = f1_score(y_train, MODEL.predict(X_train), average="macro", zero_division=0)
+        f1_base_val   = f1_score(y_val,   MODEL.predict(X_val),   average="macro", zero_division=0)
+
+        # Per-class F1
+        from sklearn.metrics import f1_score as f1
+        classes = sorted(set(y_train))
+        lines = [
+            f"Config : C={C}, max_features={max_features}, ngrams={ngram_range}",
+            "",
+            f"{'':26} {'baseline':>10} {'tuned':>10} {'delta':>10}",
+            f"{'Train macro-F1':<26} {f1_base_train:>10.4f} {f1_train:>10.4f} {f1_train - f1_base_train:>+10.4f}",
+            f"{'Val macro-F1':<26} {f1_base_val:>10.4f} {f1_val:>10.4f} {f1_val - f1_base_val:>+10.4f}",
+            "",
+            f"{'Category':<26} {'val F1 (base)':>14} {'val F1 (tuned)':>14}",
+            "-" * 56,
+        ]
+        y_pred_base  = MODEL.predict(X_val)
+        y_pred_tuned = model.predict(X_val)
+        for cls in classes:
+            mask = y_val == cls
+            if not mask.any():
+                continue
+            f1_b = f1(y_val, y_pred_base,  labels=[cls], average="macro", zero_division=0)
+            f1_t = f1(y_val, y_pred_tuned, labels=[cls], average="macro", zero_division=0)
+            marker = " ↑" if f1_t > f1_b else (" ↓" if f1_t < f1_b else "")
+            lines.append(f"  {cls:<24} {f1_b:>14.4f} {f1_t:>14.4f}{marker}")
+
+        return "\n".join(lines)
+
+    @output
+    @render.text
+    def tune_result():
+        return _tune_result()
+
+    # ── Panel 4: Prediction ───────────────────────────────────────────────────
     @reactive.Calc
     @reactive.event(input.predict_btn)
     def _prediction():
