@@ -4,3 +4,6 @@ watchdog         # For monitoring file changes
 scikit-learn     # For data preprocessing and modeling
 matplotlib       # For data visualization
 seaborn          # For statistical data visualization
+shiny            # For building the interactive web app
+shiny            # For building interactive web applications
+plotly           # For interactive visualizations
