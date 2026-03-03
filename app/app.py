@@ -6,7 +6,7 @@ Shiny app for the transaction categorization project.
 Panels
 ------
 1. Data Explorer  — class distribution, amount by category, top tokens
-2. Model Results  — training vs validation metrics, confusion matrix
+2. Model Results  — training vs validation metrics
 3. Prediction     — type a subject + amount, get a predicted category
 """
 
@@ -16,9 +16,11 @@ import argparse
 import pickle
 import pandas as pd
 import uvicorn
+import matplotlib.pyplot as plt
 from datetime import date
 from shiny import App, ui, render, reactive
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, classification_report
+from sklearn.linear_model import LogisticRegression
 
 # Resolve project root before any local imports
 APP_DIR = Path(__file__).parent
@@ -55,7 +57,17 @@ app_ui = ui.page_navbar(
         "Data Explorer",
         ui.h3("Data Explorer"),
         ui.p("Visualize the raw data before touching the model."),
-        ui.output_text_verbatim("data_summary"),
+        ui.layout_columns(
+            ui.card(
+                ui.card_header("Class distribution"),
+                ui.output_text_verbatim("data_summary"),
+            ),
+            ui.card(
+                ui.card_header("Sample count per category"),
+                ui.output_plot("class_distribution", height="350px"),
+            ),
+            col_widths=(4, 8),
+        ),
     ),
 
     # ── Panel 2: Model Results ───────────────────────────────────────────────
@@ -63,25 +75,19 @@ app_ui = ui.page_navbar(
         "Model Results",
         ui.h3("Model Results"),
         ui.p("Training vs validation performance."),
-        ui.div(
-            ui.h5("What is Macro F1?"),
-            ui.p(
-                "F1 is the harmonic mean of precision and recall for a single class. "
-                "Macro F1 averages the per-class F1 scores without weighting by class size, "
-                "so a rare class with F1=0.00 hurts the score just as much as a common one. "
-                "This makes it a strict measure: the model must perform well across ",
-                ui.strong("all"), " categories, not just the frequent ones."
+        ui.layout_columns(
+            ui.card(
+                ui.card_header("Model Details"),
+                ui.card_body(
+                    ui.output_text_verbatim("model_details"),
+                ),
             ),
-            ui.p(
-                ui.em("Rule of thumb: "), "Training F1 ≫ Validation F1 signals overfitting. "
-                "Here, the gap is driven mainly by ", ui.code("business_equipment"),
-                ", which scores F1=0.96 on training data but F1=0.00 on validation — "
-                "likely because it acts as a catch-all category with too few and too diverse samples to generalize."
+            ui.card(
+                ui.card_header("Model Summary"),
+                ui.output_text_verbatim("model_summary"),
             ),
-            class_="alert alert-secondary",
-            style="font-size: 0.9rem;",
+            col_widths=(4, 8),
         ),
-        ui.output_text_verbatim("model_summary"),
     ),
 
     # ── Panel 3: Hyperparameter Tuning ────────────────────────────────────────
@@ -134,6 +140,7 @@ app_ui = ui.page_navbar(
     ui.nav_panel(
         "Prediction",
         ui.h3("Prediction Tool"),
+        ui.p("Type a transaction subject and amount, and see the predicted category with confidence scores."),
         ui.layout_sidebar(
             ui.sidebar(
                 ui.input_text("subject", "Subject text", placeholder="e.g. Google Ads Payment"),
@@ -168,6 +175,15 @@ def server(input, output, session):
             lines.append(f"  {cat:<25} {n:>3}")
         return "\n".join(lines)
 
+    @output
+    @render.plot
+    def class_distribution():
+        counts = df_train["category"].value_counts()
+        fig, ax = plt.subplots()
+        counts.plot(kind="bar", ax=ax, rot=45)
+        ax.set_ylabel("Count")
+        return fig
+
     # ── Panel 2 ──────────────────────────────────────────────────────────────
     @output
     @render.text
@@ -179,17 +195,33 @@ def server(input, output, session):
         f1_train = f1_score(y_train, MODEL.predict(X_train), average="macro", zero_division=0)
         f1_val   = f1_score(y_val,   MODEL.predict(X_val),   average="macro", zero_division=0)
 
+        report = classification_report(
+            y_val, MODEL.predict(X_val), zero_division=0, digits=2
+        )
+
         return (
             f"Training macro-F1  : {f1_train:.4f}\n"
             f"Validation macro-F1: {f1_val:.4f}\n"
+            f"\nPer-class breakdown (validation):\n"
+            f"{report}"
+        )
+
+    @output
+    @render.text
+    def model_details():
+        return (
+            "Algorithm: Multinomial Logistic Regression\n"
+            "C: 1.0 (regularization strength)\n"
+            "Solver: lbfgs (good for small datasets)\n"
+            "Class weight: balanced\n"
+            "Feature space: 491 features (TF-IDF + numerical)\n"
+            "n-gram range: (1, 2), max_features: 500\n"
         )
 
     # ── Panel 3: Hyperparameter Tuning ──────────────────────────────────────
     @reactive.Calc
     @reactive.event(input.tune_btn)
     def _tune_result():
-        from sklearn.linear_model import LogisticRegression
-
         C            = float(input.tune_C())
         max_features = int(input.tune_max_features())
         ngram_min    = int(input.tune_ngram_min())
@@ -204,7 +236,7 @@ def server(input, output, session):
         X_train, y_train, vectorizer, scaler = build_feature_matrix(
             df_train, ngram_range=ngram_range, max_features=max_features
         )
-        X_val = transform_features(df_val, vectorizer, scaler)
+        X_val_tuned = transform_features(df_val, vectorizer, scaler)
         y_val = df_val["category"].values
 
         model = LogisticRegression(
@@ -214,14 +246,15 @@ def server(input, output, session):
         model.fit(X_train, y_train)
 
         f1_train = f1_score(y_train, model.predict(X_train), average="macro", zero_division=0)
-        f1_val   = f1_score(y_val,   model.predict(X_val),   average="macro", zero_division=0)
+        f1_val   = f1_score(y_val,   model.predict(X_val_tuned), average="macro", zero_division=0)
 
-        # Baseline (model loaded at startup)
-        f1_base_train = f1_score(y_train, MODEL.predict(X_train), average="macro", zero_division=0)
-        f1_base_val   = f1_score(y_val,   MODEL.predict(X_val),   average="macro", zero_division=0)
+        # Baseline — must use original VECTORIZER/SCALER (different feature space)
+        X_train_base, y_train_base, _, _ = build_feature_matrix(df_train)
+        X_val_base = transform_features(df_val, VECTORIZER, SCALER)
+        f1_base_train = f1_score(y_train_base, MODEL.predict(X_train_base), average="macro", zero_division=0)
+        f1_base_val   = f1_score(y_val,        MODEL.predict(X_val_base),   average="macro", zero_division=0)
 
         # Per-class F1
-        from sklearn.metrics import f1_score as f1
         classes = sorted(set(y_train))
         lines = [
             f"Config : C={C}, max_features={max_features}, ngrams={ngram_range}",
@@ -233,14 +266,14 @@ def server(input, output, session):
             f"{'Category':<26} {'val F1 (base)':>14} {'val F1 (tuned)':>14}",
             "-" * 56,
         ]
-        y_pred_base  = MODEL.predict(X_val)
-        y_pred_tuned = model.predict(X_val)
+        y_pred_base  = MODEL.predict(X_val_base)
+        y_pred_tuned = model.predict(X_val_tuned)
         for cls in classes:
             mask = y_val == cls
             if not mask.any():
                 continue
-            f1_b = f1(y_val, y_pred_base,  labels=[cls], average="macro", zero_division=0)
-            f1_t = f1(y_val, y_pred_tuned, labels=[cls], average="macro", zero_division=0)
+            f1_b = f1_score(y_val, y_pred_base,  labels=[cls], average="macro", zero_division=0)
+            f1_t = f1_score(y_val, y_pred_tuned, labels=[cls], average="macro", zero_division=0)
             marker = " ↑" if f1_t > f1_b else (" ↓" if f1_t < f1_b else "")
             lines.append(f"  {cls:<24} {f1_b:>14.4f} {f1_t:>14.4f}{marker}")
 
@@ -286,9 +319,10 @@ def server(input, output, session):
             return "Enter a subject and click Predict."
 
         lines = [f"Predicted category: {predicted}", "", "Confidence scores:"]
+        max_cat_length = max(len(cat) for cat, _ in scores)
         for cat, p in scores:
             bar = "█" * int(p * 30)
-            lines.append(f"  {cat:<25} {p:.2%}  {bar}")
+            lines.append(f"  {cat:<{max_cat_length}} {p:>6.2%}  {bar}")
         return "\n".join(lines)
 
 
