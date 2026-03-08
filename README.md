@@ -13,14 +13,6 @@ Dash/
 ├── app/
 │   ├── dev.py                   # Model development dashboard
 │   └── categorize.py            # Monthly production categorization
-├── config/
-│   ├── config.py                # Paths and project-wide constants
-│   ├── alias_mapping.json       # Counterparty alias normalization
-│   └── category_mapping.json    # Rule-based category labels
-├── data/
-│   ├── raw/                     # Original CSV exports from the bank
-│   └── processed/               # Cleaned train/val CSVs
-├── docs/                        # Analysis notes and documentation
 ├── models/                      # Pickled model artifacts (.pkl)
 ├── src/
 │   ├── processing.py            # ETL: load, clean, extract, categorize
