@@ -5,9 +5,10 @@ Shiny app for the transaction categorization project.
 
 Panels
 ------
-1. Data Explorer  — class distribution, amount by category, top tokens
-2. Model Results  — training vs validation metrics
-3. Prediction     — type a subject + amount, get a predicted category
+1. Data Loading          — upload raw bank CSVs, run processing pipeline
+2. Data Explorer         — class distribution, sample counts
+3. Hyperparameter Tuning — retrain LR / RF with different settings
+4. Model Results         — training vs validation metrics for the last-trained model
 """
 
 import sys
@@ -17,17 +18,17 @@ import pickle
 import pandas as pd
 import uvicorn
 import matplotlib.pyplot as plt
-from datetime import date
 from shiny import App, ui, render, reactive
 from sklearn.metrics import f1_score, classification_report
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
 # Resolve project root before any local imports
-APP_DIR = Path(__file__).parent
-PROJECT_ROOT = APP_DIR.parent
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.feature_engineering import transform_features, build_feature_matrix
+from src.processing import load_data, extract_counterparty, assign_category
 import config.config as config
 
 MODEL_PATH = PROJECT_ROOT / "models" / "logistic_regression.pkl"
@@ -43,16 +44,49 @@ VECTORIZER = _bundle["vectorizer"]
 SCALER = _bundle["scaler"]
 
 # ---------------------------------------------------------------------------
-# Load data once at startup
+# Load data once at startup (defaults — can be replaced via Data Loading tab)
 # ---------------------------------------------------------------------------
-df_train = pd.read_csv(config.TRAIN_OUTPUT_FILE, sep=";", decimal=",", parse_dates=["booking_date"])
-df_val   = pd.read_csv(config.VAL_OUTPUT_FILE,   sep=";", decimal=",", parse_dates=["booking_date"])
+_df_train_default = pd.read_csv(config.TRAIN_OUTPUT_FILE, sep=";", decimal=",", parse_dates=["booking_date"])
+_df_val_default   = pd.read_csv(config.VAL_OUTPUT_FILE,   sep=";", decimal=",", parse_dates=["booking_date"])
 
 # ===========================================================================
 # UI
 # ===========================================================================
 app_ui = ui.page_navbar(
-    # ── Panel 1: Data Explorer ───────────────────────────────────────────────
+    # ── Panel 1: Data Loading ───────────────────────────────────────────────
+    ui.nav_panel(
+        "Data Loading",
+        ui.h3("Data Loading"),
+        ui.p(
+            "Upload raw bank CSV exports. The processing pipeline will clean the data, "
+            "extract counterparties, and assign categories automatically."
+        ),
+        ui.layout_columns(
+            ui.card(
+                ui.card_header("Training data"),
+                ui.input_file(
+                    "upload_train", "Upload training CSV",
+                    accept=[".csv"], multiple=False,
+                ),
+                ui.output_text_verbatim("upload_train_status"),
+            ),
+            ui.card(
+                ui.card_header("Validation data"),
+                ui.input_file(
+                    "upload_val", "Upload validation CSV",
+                    accept=[".csv"], multiple=False,
+                ),
+                ui.output_text_verbatim("upload_val_status"),
+            ),
+            col_widths=(6, 6),
+        ),
+        ui.card(
+            ui.card_header("Data preview (training)"),
+            ui.output_text_verbatim("upload_preview"),
+        ),
+    ),
+
+    # ── Panel 2: Data Explorer ──────────────────────────────────────────────
     ui.nav_panel(
         "Data Explorer",
         ui.h3("Data Explorer"),
@@ -70,26 +104,6 @@ app_ui = ui.page_navbar(
         ),
     ),
 
-    # ── Panel 2: Model Results ───────────────────────────────────────────────
-    ui.nav_panel(
-        "Model Results",
-        ui.h3("Model Results"),
-        ui.p("Training vs validation performance."),
-        ui.layout_columns(
-            ui.card(
-                ui.card_header("Model Details"),
-                ui.card_body(
-                    ui.output_text_verbatim("model_details"),
-                ),
-            ),
-            ui.card(
-                ui.card_header("Model Summary"),
-                ui.output_text_verbatim("model_summary"),
-            ),
-            col_widths=(4, 8),
-        ),
-    ),
-
     # ── Panel 3: Hyperparameter Tuning ────────────────────────────────────────
     ui.nav_panel(
         "Hyperparameter Tuning",
@@ -100,15 +114,42 @@ app_ui = ui.page_navbar(
         ),
         ui.layout_sidebar(
             ui.sidebar(
-                ui.h5("Logistic Regression"),
-                ui.input_numeric(
-                    "tune_C", "C (regularization)",
-                    value=1.0, min=0.01, max=100.0, step=0.1,
+                ui.h5("Algorithm"),
+                ui.input_select(
+                    "tune_algo", "Model",
+                    choices=["Logistic Regression", "Random Forest"],
+                    selected="Logistic Regression",
                 ),
-                ui.p(
-                    ui.em("Smaller C = stronger regularization = simpler model. "
-                          "Try lowering it if the model overfits."),
-                    style="font-size:0.8rem; color:#666;",
+                ui.hr(),
+                ui.panel_conditional(
+                    "input.tune_algo === 'Logistic Regression'",
+                    ui.h5("Logistic Regression"),
+                    ui.input_numeric(
+                        "tune_C", "C (regularization)",
+                        value=1.0, min=0.01, max=100.0, step=0.1,
+                    ),
+                    ui.p(
+                        ui.em("Smaller C = stronger regularization = simpler model. "
+                              "Try lowering it if the model overfits."),
+                        style="font-size:0.8rem; color:#666;",
+                    ),
+                ),
+                ui.panel_conditional(
+                    "input.tune_algo === 'Random Forest'",
+                    ui.h5("Random Forest"),
+                    ui.input_numeric(
+                        "tune_n_estimators", "Number of trees",
+                        value=200, min=10, max=2000, step=10,
+                    ),
+                    ui.input_numeric(
+                        "tune_max_depth", "Max depth (0 = unlimited)",
+                        value=0, min=0, max=100, step=1,
+                    ),
+                    ui.p(
+                        ui.em("More trees = more stable predictions but slower. "
+                              "Limiting depth can reduce overfitting."),
+                        style="font-size:0.8rem; color:#666;",
+                    ),
                 ),
                 ui.hr(),
                 ui.h5("TF-IDF"),
@@ -136,18 +177,23 @@ app_ui = ui.page_navbar(
         ),
     ),
 
-    # ── Panel 4: Prediction Tool ─────────────────────────────────────────────
+    # ── Panel 4: Model Results ───────────────────────────────────────────────
     ui.nav_panel(
-        "Prediction",
-        ui.h3("Prediction Tool"),
-        ui.p("Type a transaction subject and amount, and see the predicted category with confidence scores."),
-        ui.layout_sidebar(
-            ui.sidebar(
-                ui.input_text("subject", "Subject text", placeholder="e.g. Google Ads Payment"),
-                ui.input_numeric("amount", "Amount (€)", value=-50.0, step=0.01),
-                ui.input_action_button("predict_btn", "Predict", class_="btn-primary"),
+        "Model Results",
+        ui.h3("Model Results"),
+        ui.p("Training vs validation performance."),
+        ui.layout_columns(
+            ui.card(
+                ui.card_header("Model Details"),
+                ui.card_body(
+                    ui.output_text_verbatim("model_details"),
+                ),
             ),
-            ui.output_text_verbatim("prediction_result"),
+            ui.card(
+                ui.card_header("Model Summary"),
+                ui.output_text_verbatim("model_summary"),
+            ),
+            col_widths=(4, 8),
         ),
     ),
 
@@ -160,10 +206,91 @@ app_ui = ui.page_navbar(
 # ===========================================================================
 def server(input, output, session):
 
-    # ── Panel 1 ──────────────────────────────────────────────────────────────
+    # ── Reactive data: train/val DataFrames ───────────────────────────────
+    r_df_train = reactive.Value(_df_train_default)
+    r_df_val   = reactive.Value(_df_val_default)
+
+    # ── Reactive values for last-tuned model ────────────────────────────────
+    _last_tuned_model      = reactive.Value(None)
+    _last_tuned_vectorizer = reactive.Value(None)
+    _last_tuned_scaler     = reactive.Value(None)
+    _last_tuned_details    = reactive.Value(None)
+
+    # ── Helper: process a raw uploaded CSV ─────────────────────────────────
+    def _process_upload(file_info: list | None) -> pd.DataFrame | None:
+        """Run the processing pipeline on an uploaded raw bank CSV."""
+        if file_info is None or len(file_info) == 0:
+            return None
+        path = Path(file_info[0]["datapath"])
+        src = load_data(path)
+        df = src[["booking_date", "subject", "amount"]].copy()
+        df["counterparty"] = df["subject"].apply(extract_counterparty)
+        df["category"] = df["counterparty"].apply(assign_category)
+        return df
+
+    # ── Panel 1: Data Loading ───────────────────────────────────────────────
+    @reactive.Effect
+    @reactive.event(input.upload_train)
+    def _on_upload_train():
+        df = _process_upload(input.upload_train())
+        if df is not None:
+            r_df_train.set(df)
+            # Reset tuned model since data changed
+            _last_tuned_model.set(None)
+            _last_tuned_details.set(None)
+
+    @reactive.Effect
+    @reactive.event(input.upload_val)
+    def _on_upload_val():
+        df = _process_upload(input.upload_val())
+        if df is not None:
+            r_df_val.set(df)
+            _last_tuned_model.set(None)
+            _last_tuned_details.set(None)
+
+    @output
+    @render.text
+    def upload_train_status():
+        df = r_df_train.get()
+        n_cats = df["category"].nunique()
+        n_uncat = (df["category"] == "uncategorized").sum()
+        return (
+            f"Loaded: {len(df)} transactions, {n_cats} categories\n"
+            f"Uncategorized: {n_uncat}"
+        )
+
+    @output
+    @render.text
+    def upload_val_status():
+        df = r_df_val.get()
+        n_cats = df["category"].nunique()
+        n_uncat = (df["category"] == "uncategorized").sum()
+        return (
+            f"Loaded: {len(df)} transactions, {n_cats} categories\n"
+            f"Uncategorized: {n_uncat}"
+        )
+
+    @output
+    @render.text
+    def upload_preview():
+        df = r_df_train.get()
+        lines = []
+        for _, row in df.head(10).iterrows():
+            lines.append(
+                f"  {str(row['booking_date'])[:10]}  "
+                f"{row['amount']:>10.2f}  "
+                f"{row['category']:<22} "
+                f"{row['subject'][:60]}"
+            )
+        header = f"{'  Date':<12} {'Amount':>10}  {'Category':<22} Subject"
+        return header + "\n" + "-" * 100 + "\n" + "\n".join(lines) + f"\n\n... ({len(df)} rows total)"
+
+    # ── Panel 2 ──────────────────────────────────────────────────────────────
     @output
     @render.text
     def data_summary():
+        df_train = r_df_train.get()
+        df_val = r_df_val.get()
         lines = [
             f"Training samples  : {len(df_train)}",
             f"Validation samples: {len(df_val)}",
@@ -178,25 +305,36 @@ def server(input, output, session):
     @output
     @render.plot
     def class_distribution():
+        df_train = r_df_train.get()
         counts = df_train["category"].value_counts()
         fig, ax = plt.subplots()
         counts.plot(kind="bar", ax=ax, rot=45)
         ax.set_ylabel("Count")
         return fig
 
-    # ── Panel 2 ──────────────────────────────────────────────────────────────
+    # ── Panel: Model Results (reactive — updates after tuning) ───────────────
     @output
     @render.text
     def model_summary():
-        X_train, y_train, _, _ = build_feature_matrix(df_train)
-        X_val = transform_features(df_val, VECTORIZER, SCALER)
+        df_train = r_df_train.get()
+        df_val = r_df_val.get()
+        mdl = _last_tuned_model.get()
+        vec = _last_tuned_vectorizer.get()
+        sc  = _last_tuned_scaler.get()
+
+        if mdl is None:
+            mdl, vec, sc = MODEL, VECTORIZER, SCALER
+
+        y_train = df_train["category"].values
+        X_train_t = transform_features(df_train, vec, sc)
+        X_val = transform_features(df_val, vec, sc)
         y_val = df_val["category"].values
 
-        f1_train = f1_score(y_train, MODEL.predict(X_train), average="macro", zero_division=0)
-        f1_val   = f1_score(y_val,   MODEL.predict(X_val),   average="macro", zero_division=0)
+        f1_train = f1_score(y_train, mdl.predict(X_train_t), average="macro", zero_division=0)
+        f1_val   = f1_score(y_val,   mdl.predict(X_val),   average="macro", zero_division=0)
 
         report = classification_report(
-            y_val, MODEL.predict(X_val), zero_division=0, digits=2
+            y_val, mdl.predict(X_val), zero_division=0, digits=2
         )
 
         return (
@@ -209,6 +347,10 @@ def server(input, output, session):
     @output
     @render.text
     def model_details():
+        details = _last_tuned_details.get()
+        if details is not None:
+            return details
+
         return (
             "Algorithm: Multinomial Logistic Regression\n"
             "C: 1.0 (regularization strength)\n"
@@ -222,7 +364,9 @@ def server(input, output, session):
     @reactive.Calc
     @reactive.event(input.tune_btn)
     def _tune_result():
-        C            = float(input.tune_C())
+        df_train = r_df_train.get()
+        df_val = r_df_val.get()
+        algo         = input.tune_algo()
         max_features = int(input.tune_max_features())
         ngram_min    = int(input.tune_ngram_min())
         ngram_max    = int(input.tune_ngram_max())
@@ -239,11 +383,51 @@ def server(input, output, session):
         X_val_tuned = transform_features(df_val, vectorizer, scaler)
         y_val = df_val["category"].values
 
-        model = LogisticRegression(
-            C=C, class_weight="balanced", solver="lbfgs",
-            max_iter=1000, random_state=42,
-        )
+        if algo == "Random Forest":
+            n_estimators = int(input.tune_n_estimators())
+            max_depth_val = int(input.tune_max_depth())
+            max_depth = None if max_depth_val == 0 else max_depth_val
+            model = RandomForestClassifier(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                class_weight="balanced",
+                random_state=42,
+                n_jobs=-1,
+            )
+            config_str = f"Algorithm: Random Forest, n_estimators={n_estimators}, max_depth={max_depth}"
+        else:
+            C = float(input.tune_C())
+            model = LogisticRegression(
+                C=C, class_weight="balanced", solver="lbfgs",
+                max_iter=1000, random_state=42,
+            )
+            config_str = f"Algorithm: Logistic Regression, C={C}"
+
         model.fit(X_train, y_train)
+
+        # Store so Model Results tab reflects this model
+        _last_tuned_model.set(model)
+        _last_tuned_vectorizer.set(vectorizer)
+        _last_tuned_scaler.set(scaler)
+
+        # Build details string for the Model Results tab
+        detail_lines = [config_str]
+        if algo == "Random Forest":
+            detail_lines += [
+                f"n_estimators: {n_estimators}",
+                f"max_depth: {max_depth}",
+            ]
+        else:
+            detail_lines += [
+                f"C: {C} (regularization strength)",
+                "Solver: lbfgs",
+            ]
+        detail_lines += [
+            "Class weight: balanced",
+            f"Feature space: {X_train.shape[1]} features (TF-IDF + numerical)",
+            f"n-gram range: {ngram_range}, max_features: {max_features}",
+        ]
+        _last_tuned_details.set("\n".join(detail_lines))
 
         f1_train = f1_score(y_train, model.predict(X_train), average="macro", zero_division=0)
         f1_val   = f1_score(y_val,   model.predict(X_val_tuned), average="macro", zero_division=0)
@@ -257,7 +441,7 @@ def server(input, output, session):
         # Per-class F1
         classes = sorted(set(y_train))
         lines = [
-            f"Config : C={C}, max_features={max_features}, ngrams={ngram_range}",
+            f"{config_str}, max_features={max_features}, ngrams={ngram_range}",
             "",
             f"{'':26} {'baseline':>10} {'tuned':>10} {'delta':>10}",
             f"{'Train macro-F1':<26} {f1_base_train:>10.4f} {f1_train:>10.4f} {f1_train - f1_base_train:>+10.4f}",
@@ -283,47 +467,6 @@ def server(input, output, session):
     @render.text
     def tune_result():
         return _tune_result()
-
-    # ── Panel 4: Prediction ───────────────────────────────────────────────────
-    @reactive.Calc
-    @reactive.event(input.predict_btn)
-    def _prediction():
-        subject = input.subject().strip()
-        amount  = float(input.amount())
-
-        if not subject:
-            return None, None
-
-        # Build a single-row DataFrame matching the processed CSV schema
-        today = pd.Timestamp(date.today())
-        row = pd.DataFrame([{
-            "booking_date": today,
-            "subject": subject,
-            "amount": amount,
-            "counterparty": "",
-            "category": "unknown",
-        }])
-
-        X = transform_features(row, VECTORIZER, SCALER)
-        predicted = MODEL.predict(X)[0]
-        proba = MODEL.predict_proba(X)[0]
-        classes = MODEL.classes_
-
-        return predicted, sorted(zip(classes, proba), key=lambda x: -x[1])
-
-    @output
-    @render.text
-    def prediction_result():
-        predicted, scores = _prediction()
-        if predicted is None:
-            return "Enter a subject and click Predict."
-
-        lines = [f"Predicted category: {predicted}", "", "Confidence scores:"]
-        max_cat_length = max(len(cat) for cat, _ in scores)
-        for cat, p in scores:
-            bar = "█" * int(p * 30)
-            lines.append(f"  {cat:<{max_cat_length}} {p:>6.2%}  {bar}")
-        return "\n".join(lines)
 
 
 # ===========================================================================

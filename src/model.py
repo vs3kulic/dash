@@ -18,6 +18,7 @@ from pathlib import Path
 from scipy.sparse import csr_matrix
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, f1_score
 
 # ---------------------------------------------------------------------------
@@ -34,6 +35,7 @@ from src.feature_engineering import build_feature_matrix, transform_features
 # ---------------------------------------------------------------------------
 MODELS_DIR = PROJECT_ROOT / "models"
 MODEL_PATH = MODELS_DIR / "logistic_regression.pkl"
+RF_MODEL_PATH = MODELS_DIR / "random_forest.pkl"
 
 
 # ===========================================================================
@@ -64,6 +66,33 @@ def train_logistic_regression(
         solver="lbfgs",
         max_iter=max_iter,
         random_state=42,
+    )
+    model.fit(X_train, y_train)
+    return model
+
+
+def train_random_forest(
+    X_train: csr_matrix,
+    y_train: np.ndarray,
+    n_estimators: int = 200,
+    max_depth: int | None = None,
+) -> RandomForestClassifier:
+    """Fit a Random Forest classifier on the training data.
+
+    Uses ``class_weight='balanced'`` to compensate for class imbalance.
+
+    :param X_train: Sparse feature matrix from :func:`build_feature_matrix`.
+    :param y_train: Label array of category strings.
+    :param n_estimators: Number of trees in the forest.
+    :param max_depth: Maximum depth of trees (``None`` = unlimited).
+    :return: Fitted :class:`~sklearn.ensemble.RandomForestClassifier`.
+    """
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=-1,
     )
     model.fit(X_train, y_train)
     return model
@@ -133,14 +162,19 @@ def main() -> None:
 
     # ── Train ────────────────────────────────────────────────────────────────
     print("\nTraining Logistic Regression (C=1.0, class_weight='balanced') ...")
-    model = train_logistic_regression(X_train, y_train)
+    lr_model = train_logistic_regression(X_train, y_train)
 
-    # ── Evaluate ─────────────────────────────────────────────────────────────
-    evaluate(model, X_train, y_train, split_name="Training")
-    evaluate(model, X_val, y_val, split_name="Validation")
+    print("\nTraining Random Forest (n_estimators=200, class_weight='balanced') ...")
+    rf_model = train_random_forest(X_train, y_train)
 
-    # ── Misclassified validation samples ─────────────────────────────────────
-    y_pred_val = model.predict(X_val)
+    # ── Evaluate ───────────────────────────────────────────────────────────────────
+    evaluate(lr_model, X_train, y_train, split_name="LR Training")
+    evaluate(lr_model, X_val, y_val, split_name="LR Validation")
+    evaluate(rf_model, X_train, y_train, split_name="RF Training")
+    evaluate(rf_model, X_val, y_val, split_name="RF Validation")
+
+    # ── Misclassified validation samples (LR) ─────────────────────────────
+    y_pred_val = lr_model.predict(X_val)
     misclassified = df_val[y_pred_val != y_val].copy()
     misclassified["predicted"] = y_pred_val[y_pred_val != y_val]
     misclassified = misclassified[["subject", "amount", "category", "predicted"]]
@@ -155,8 +189,12 @@ def main() -> None:
     # ── Save ─────────────────────────────────────────────────────────────────
     MODELS_DIR.mkdir(exist_ok=True)
     with open(MODEL_PATH, "wb") as f:
-        pickle.dump({"model": model, "vectorizer": vectorizer, "scaler": scaler}, f)
-    print(f"\nModel saved to {MODEL_PATH}")
+        pickle.dump({"model": lr_model, "vectorizer": vectorizer, "scaler": scaler}, f)
+    print(f"\nLR model saved to {MODEL_PATH}")
+
+    with open(RF_MODEL_PATH, "wb") as f:
+        pickle.dump({"model": rf_model, "vectorizer": vectorizer, "scaler": scaler}, f)
+    print(f"RF model saved to {RF_MODEL_PATH}")
 
 
 if __name__ == "__main__":
