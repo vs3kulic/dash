@@ -11,7 +11,8 @@ Automatically categorize bank transactions based on subject text and amount, usi
 ```
 Dash/
 ├── app/
-│   └── app.py                   # Shiny dashboard (4 tabs)
+│   ├── dev.py                   # Model development dashboard
+│   └── categorize.py            # Monthly production categorization
 ├── config/
 │   ├── config.py                # Paths and project-wide constants
 │   ├── alias_mapping.json       # Counterparty alias normalization
@@ -55,7 +56,7 @@ Dash/
 - Misclassified validation samples are printed for error analysis
 - Each model is pickled to `models/` along with its vectorizer and scaler
 
-### 4. Interactive Dashboard (`app/app.py`)
+### 4. Interactive Dashboard (`app/dev.py`)
 
 A Shiny for Python app with four tabs:
 
@@ -69,8 +70,8 @@ A Shiny for Python app with four tabs:
 Run the app:
 
 ```bash
-python app/app.py              # defaults to http://127.0.0.1:8008
-python app/app.py --port 9000  # custom port
+python app/dev.py              # model development — http://127.0.0.1:8008
+python app/categorize.py       # monthly categorization — http://127.0.0.1:8009
 ```
 
 ## Setup
